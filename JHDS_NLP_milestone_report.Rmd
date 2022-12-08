@@ -1,3 +1,36 @@
+---
+title: "JHDS_NLP_Milestone_Report"
+author: "Ji"
+date: "2022-12-07"
+output: html_document
+---
+## Introduction
+This project used data from this website: https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip.
+The data includes news, twitter and blog in English.\n
+
+The motivation for this project is to:\n
+- Demonstrate that I've downloaded the data and have successfully loaded it in R.
+- Create a basic report of summary statistics about the data sets.
+- Report interesting findings that I amassed.
+- Get feedback on my plans for creating a prediction algorithm and Shiny app.
+
+To get fast results, a portion of data is taken from the original data for analysis.\n
+Steps of data cleaning:\n
+- Remove numbers.
+- Remove non-English style quotes.
+- Replace contraction with complete words: eg. We've -> We have.
+- Format words to lowercase.
+- Separate words that are connected by punctuation: eg. good.We -> good we.
+- Remove punctuation.
+- Trim extra white spaces.
+- Remove single letters except "a" and "i".
+
+Steps of data tokenization:\n
+- 1_gram: split the data by white spaces into words, count words frequencies.
+- n_gram (n>1): use a moving window of n to form n lists, paste words of the n lists to form phrases, count frequencies.\n
+
+## Load data and required packages 
+```{r warning = FALSE, message = FALSE}
 path<-"C:/Postdoc/Coursera/DScourse/Coursera-SwiftKey/final/en_US"
 twitter<-readLines(paste(path,"/en_US.twitter.txt",sep=""),encoding = "UTF-8",skipNul = TRUE)
 blog<-readLines(paste(path,"/en_US.blogs.txt",sep=""),encoding = "UTF-8",skipNul = TRUE)
@@ -9,10 +42,11 @@ library(ggplot2)
 library(data.table) # shift
 library(tidyr)
 library(dplyr)  # arrange
-install.packages("textclean")
+install.packages("textclean", repos='http://cran.us.r-project.org')
 library(textclean) # replace_contraction
-
-# functions that will be used for data analysis
+```
+## Load r functions that will be used for data analysis
+```{r warning = FALSE, message = FALSE}
 # function 1: clean data
 # input is a long character, output is a long character
 clean_data<-function(input){
@@ -34,17 +68,6 @@ clean_data<-function(input){
 }
 
 # function 2: n-gram tokenization, save result in a data frame
-# ngram_df<-function(input, n){
-#  df<-data.frame(matrix(ncol = 1, nrow = 0)) # build an empty df
-#  length_input<-length(str_split(input," ")[[1]])
-#  for (i in 1:length_input){
-#    df<-rbind(df,word(sample_clean, i,i+n-1, sep=" ")) 
-# word function is in the stringr package
-#  }
-#  colnames(df)<-"words"
-#  return(df)
-#} # DO NOT loop, too slow
-
 # input is a long character after cleaning, n is n_gram 
 # output is a dataframe with all possible phrases
 # This is fast, but it does NOT work for n = 1
@@ -58,7 +81,6 @@ ngram_df2<-function(input, n){
   colnames(grams)<-"words"
   return(grams)
 }
-
 # function 3: get data frame in descending order of word frequency
 # input is a data frame with all possible phrases
 # output is a data frame of words and counts
@@ -69,7 +91,6 @@ wfreq_df<-function(input){
   colnames(wfreq_df)<-c("words","count")
   return(wfreq_df)
 }
-
 # function 4: plots words distribution for n_gram tokenization, n is the top n words/phrases
 # input is a data frame of all words and counts, num is the number of phrases the plot shows
 # output is a plot of top num of phrases and counts
@@ -85,29 +106,37 @@ plot_ngram<-function(input, num, ngram){
     coord_flip()
   return (g)
 }
-###########
-# 1. Basic summary of the data
+```
+
+## Basic summary of the data
+```{r}
 # line count
 lcount_n<-length(news)
 lcount_t<-length(twitter)
 lcount_b<-length(blog)
 # character count
 ccount_n<-sum(nchar(news))
-ccount_t<-sum(nchar(news))
-ccount_b<-sum(nchar(news))
+ccount_t<-sum(nchar(twitter))
+ccount_b<-sum(nchar(blog))
 # preliminary summary
 summary_word_line<-data.frame("items"=c("news","twitter","blog"),
                               "lines"=c(lcount_n,lcount_t,lcount_b),
                               "characters"=c(ccount_n,ccount_t,ccount_b))
-# 2. n_gram tokenization
-# combine 10% of each file to make a sample
+summary_word_line
+```
+
+## N_gram tokenization
+10 % of news, twitter and blog are combined to make a data sample for analysis.
+```{r cache=TRUE}
 set.seed(2333)
 sample_10<-paste(sapply(list(news, twitter,blog), function(x) {sample(x,length(x)*0.1)}),collapse = "")
 sample_10_clean<-clean_data(sample_10)
 # words count
 wcount<-lengths(gregexpr("\\W+", sample_10_clean)) + 1 # space+1
 print(paste("The sample has",wcount,"words."))
+```
 
+```{r cache=TRUE}
 # 1_gram tokenization
 sample_10_1gram<-as.data.frame(str_split(sample_10_clean," "))
 colnames(sample_10_1gram)<-"words"
@@ -125,19 +154,25 @@ wfreq_1gram_15<-wfreq_1gram[1:15,]
 wfreq_2gram_15<-wfreq_2gram[1:15,]
 wfreq_3gram_15<-wfreq_3gram[1:15,]
 wfreq_4gram_15<-wfreq_4gram[1:15,]
-top10<-data.frame("1_gram"=wfreq_1gram_15$words,"percent_frequency"=wfreq_1gram_15$count*100/wcount,
+top15<-data.frame("1_gram"=wfreq_1gram_15$words,"percent_frequency"=wfreq_1gram_15$count*100/wcount,
                   "2_gram"=wfreq_2gram_15$words,"percent_frequency"=wfreq_2gram_15$count*100/wcount,
                   "3_gram"=wfreq_3gram_15$words,"percent_frequency"=wfreq_3gram_15$count*100/wcount,
                   "4_gram"=wfreq_4gram_15$words,"percent_frequency"=wfreq_4gram_15$count*100/wcount)
+top15
+```
 
-# plot distribution of top 15 words frequencies?
+## Plot distribution of top 15 words frequencies
+```{r}
 plot_ngram(wfreq_1gram,15,1)
 plot_ngram(wfreq_2gram,15,2)
 plot_ngram(wfreq_3gram,15,3)
 plot_ngram(wfreq_4gram,15,4)
+```
 
-# 3. How many unique words do you need in a frequency sorted dictionary to cover
-# 50% of all word instances in the language? 90%?
+## Other findings and discussion 
+### How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+Plot words coverage vs words count to view the trend.\n
+```{r}
 # make a plot to demonstrate, coverage_vs_filter (cf)
 freq_max = wfreq_1gram$count[1] 
 q<-seq(from = 0, to = freq_max/15, by = 25)
@@ -150,17 +185,23 @@ for (i in 1:length(q)){
 }
 cf<-data.frame("word_frequency"=c(q),"percent_coverage"=c(coverage))
 ggplot(data=cf, mapping=aes(x=word_frequency,y=percent_coverage))+geom_point()+ggtitle("coverage_vs_wfreq")
+```
 
+```{r}
 cf$percent_coverage<-round(cf$percent_coverage,digit=0)
 wcount_1gram_50<-wcount_1gram-max(which(cf$percent_coverage==50))
 wcount_1gram_90<-wcount_1gram-max(which(cf$percent_coverage==90))
 print(paste(wcount_1gram_90, "words are needed to cover 90 % of the language.",
             wcount_1gram_50, "words are needed to cover 90 % of the language."))
-      
-# 4. How to evaluate words from foreign language
-# remove anything with a non a-z 0-9 character in it.
+```
 
-# 5. How to increase the coverage of words with smaller number of words in the dictionary
-# stemming, normalize words into the root form
+### How to evaluate words from foreign language?
+Remove anything with a non a-z and 0-9 character in it.
 
+### How to increase the coverage of words with smaller number of words in the dictionary?
+Try stemming, normalize words into their root form.
 
+## Next step
+- Design a shiny app that allows user to enter words.
+- Use the words frequency table to predict the next most possible word that follows the user's entry. 
+- Work on reducing the response time of the shiny app.
